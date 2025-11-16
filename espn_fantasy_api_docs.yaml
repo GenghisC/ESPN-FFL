@@ -1,0 +1,920 @@
+openapi: 3.0.0
+info:
+  title: ESPN Fantasy Football API
+  description: |
+    Comprehensive documentation for the ESPN Fantasy Football API (v3) using the espn-api Python library.
+    
+    **Authentication:**
+    Private leagues require two cookies:
+    - `swid`: Your SWID cookie from ESPN.com
+    - `espn_s2`: Your ESPN_S2 session cookie from ESPN.com
+    
+    **Base URLs:**
+    - Current Season: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/segments/0/leagues/{leagueId}`
+    - Historical: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/leagueHistory/{leagueId}?seasonId={year}`
+    
+    **Python Library:** `espn-api` (https://github.com/cwendt94/espn-api)
+    
+  version: 3.0.0
+  contact:
+    name: ESPN Fantasy API Community
+    url: https://github.com/cwendt94/espn-api
+  license:
+    name: MIT
+
+servers:
+  - url: https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl
+    description: ESPN Fantasy Football API v3
+
+tags:
+  - name: League
+    description: League-level operations and information
+  - name: Teams
+    description: Team standings, rosters, and statistics
+  - name: Matchups
+    description: Weekly matchups and box scores
+  - name: Players
+    description: Player information, stats, and free agents
+  - name: Transactions
+    description: Trades, adds, drops, and waiver wire
+  - name: Draft
+    description: Draft information and picks
+  - name: Analytics
+    description: Power rankings and advanced analytics
+
+paths:
+  /league/initialize:
+    post:
+      tags:
+        - League
+      summary: Initialize League Connection
+      description: Connect to an ESPN Fantasy Football league
+      operationId: initializeLeague
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - league_id
+                - year
+              properties:
+                league_id:
+                  type: integer
+                  description: ESPN League ID
+                  example: 987132062
+                year:
+                  type: integer
+                  description: Season year
+                  example: 2025
+                espn_s2:
+                  type: string
+                  description: ESPN S2 session cookie (required for private leagues)
+                swid:
+                  type: string
+                  description: SWID cookie (required for private leagues)
+                  example: "{93EC88D8-16BF-45A2-9323-B07B24D2BDF0}"
+      responses:
+        '200':
+          description: Successfully connected to league
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/League'
+
+  /league/info:
+    get:
+      tags:
+        - League
+      summary: Get League Information
+      description: Retrieve basic league settings and information
+      operationId: getLeagueInfo
+      responses:
+        '200':
+          description: League information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeagueSettings'
+
+  /league/standings:
+    get:
+      tags:
+        - Teams
+      summary: Get Current Standings
+      description: Returns current league standings sorted by record
+      operationId: getStandings
+      responses:
+        '200':
+          description: Standings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+
+  /league/standings/{week}:
+    get:
+      tags:
+        - Teams
+      summary: Get Standings for Specific Week
+      description: Returns league standings as of a specific week with tiebreaker logic applied
+      operationId: getStandingsWeekly
+      parameters:
+        - name: week
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 18
+          description: Week number
+      responses:
+        '200':
+          description: Weekly standings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+
+  /league/scoreboard:
+    get:
+      tags:
+        - Matchups
+      summary: Get Scoreboard
+      description: Returns matchups for current or specified week
+      operationId: getScoreboard
+      parameters:
+        - name: week
+          in: query
+          schema:
+            type: integer
+          description: Week number (defaults to current week)
+      responses:
+        '200':
+          description: Scoreboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Matchup'
+
+  /league/box-scores:
+    get:
+      tags:
+        - Matchups
+      summary: Get Box Scores
+      description: Returns detailed box scores including player performance for a given week
+      operationId: getBoxScores
+      parameters:
+        - name: week
+          in: query
+          schema:
+            type: integer
+          description: Week number (defaults to current week)
+      responses:
+        '200':
+          description: Box scores retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BoxScore'
+
+  /league/free-agents:
+    get:
+      tags:
+        - Players
+      summary: Get Free Agents
+      description: Returns list of available free agents
+      operationId: getFreeAgents
+      parameters:
+        - name: week
+          in: query
+          schema:
+            type: integer
+          description: Week number
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Number of players to return
+        - name: position
+          in: query
+          schema:
+            type: string
+            enum: [QB, RB, WR, TE, K, D/ST]
+          description: Filter by position
+      responses:
+        '200':
+          description: Free agents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Player'
+
+  /league/player-info:
+    get:
+      tags:
+        - Players
+      summary: Get Player Information
+      description: Get detailed information about a specific player
+      operationId: getPlayerInfo
+      parameters:
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Player name
+        - name: playerId
+          in: query
+          schema:
+            oneOf:
+              - type: integer
+              - type: array
+                items:
+                  type: integer
+          description: Player ID or list of player IDs
+      responses:
+        '200':
+          description: Player information retrieved successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Player'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Player'
+
+  /league/power-rankings:
+    get:
+      tags:
+        - Analytics
+      summary: Get Power Rankings
+      description: Returns power rankings for a given week
+      operationId: getPowerRankings
+      parameters:
+        - name: week
+          in: query
+          schema:
+            type: integer
+          description: Week number (defaults to current week)
+      responses:
+        '200':
+          description: Power rankings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    rank:
+                      type: integer
+                    team:
+                      $ref: '#/components/schemas/Team'
+                    score:
+                      type: number
+
+  /league/transactions:
+    get:
+      tags:
+        - Transactions
+      summary: Get League Transactions
+      description: Returns recent league transactions (adds, drops, trades)
+      operationId: getTransactions
+      parameters:
+        - name: scoring_period
+          in: query
+          schema:
+            type: integer
+          description: Scoring period to filter transactions
+        - name: types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [WAIVER, FREEAGENT, WAIVER_ERROR, TRADE]
+          description: Types of transactions to include
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /league/recent-activity:
+    get:
+      tags:
+        - Transactions
+      summary: Get Recent Activity
+      description: Returns recent league activity feed
+      operationId: getRecentActivity
+      parameters:
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 25
+          description: Number of activities to return
+        - name: msg_type
+          in: query
+          schema:
+            type: string
+          description: Filter by message type
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Pagination offset
+      responses:
+        '200':
+          description: Recent activity retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Activity'
+
+  /league/message-board:
+    get:
+      tags:
+        - League
+      summary: Get Message Board
+      description: Returns league message board posts
+      operationId: getMessageBoard
+      parameters:
+        - name: msg_types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by message types
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /league/draft:
+    get:
+      tags:
+        - Draft
+      summary: Get Draft Information
+      description: Returns draft picks and order
+      operationId: getDraft
+      responses:
+        '200':
+          description: Draft information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DraftPick'
+
+  /league/top-scorer:
+    get:
+      tags:
+        - Analytics
+      summary: Get Season Top Scorer
+      description: Returns the team with the most points scored for the season
+      operationId: getTopScorer
+      responses:
+        '200':
+          description: Top scorer retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+  /league/least-scorer:
+    get:
+      tags:
+        - Analytics
+      summary: Get Season Lowest Scorer
+      description: Returns the team with the least points scored for the season
+      operationId: getLeastScorer
+      responses:
+        '200':
+          description: Lowest scorer retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+  /league/top-scored-week:
+    get:
+      tags:
+        - Analytics
+      summary: Get Highest Scoring Week
+      description: Returns the team and week with the highest single-week score
+      operationId: getTopScoredWeek
+      responses:
+        '200':
+          description: Top scoring week retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    $ref: '#/components/schemas/Team'
+                  week:
+                    type: integer
+
+  /league/least-scored-week:
+    get:
+      tags:
+        - Analytics
+      summary: Get Lowest Scoring Week
+      description: Returns the team and week with the lowest single-week score
+      operationId: getLeastScoredWeek
+      responses:
+        '200':
+          description: Lowest scoring week retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    $ref: '#/components/schemas/Team'
+                  week:
+                    type: integer
+
+  /league/most-points-against:
+    get:
+      tags:
+        - Analytics
+      summary: Get Team with Most Points Against
+      description: Returns the team that has had the most points scored against them
+      operationId: getMostPointsAgainst
+      responses:
+        '200':
+          description: Team with most points against retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+components:
+  schemas:
+    League:
+      type: object
+      properties:
+        league_id:
+          type: integer
+          description: Unique league identifier
+          example: 987132062
+        year:
+          type: integer
+          description: Season year
+          example: 2025
+        current_week:
+          type: integer
+          description: Current week number
+          example: 11
+        nfl_week:
+          type: integer
+          description: Current NFL week
+          example: 11
+        currentMatchupPeriod:
+          type: integer
+          description: Current matchup period
+        finalScoringPeriod:
+          type: integer
+          description: Final week of regular season
+          example: 16
+        firstScoringPeriod:
+          type: integer
+          description: First week of season
+          example: 1
+        scoringPeriodId:
+          type: integer
+          description: Current scoring period
+        settings:
+          $ref: '#/components/schemas/LeagueSettings'
+        teams:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+        members:
+          type: array
+          items:
+            type: object
+            description: League members information
+        draft:
+          type: array
+          items:
+            $ref: '#/components/schemas/DraftPick'
+        previousSeasons:
+          type: array
+          items:
+            type: integer
+          description: List of previous season years
+
+    LeagueSettings:
+      type: object
+      properties:
+        name:
+          type: string
+          description: League name
+          example: "Flingin' Green Things"
+        size:
+          type: integer
+          description: Number of teams
+          example: 10
+        playoff_team_count:
+          type: integer
+          description: Number of playoff teams
+        playoff_seed_tie_rule:
+          type: string
+          description: Tiebreaker rule for playoff seeding
+        reg_season_count:
+          type: integer
+          description: Number of regular season weeks
+        scoring_type:
+          type: string
+          description: Scoring format (e.g., "H2H_POINTS")
+        trade_deadline:
+          type: integer
+          description: Trade deadline week
+        veto_votes_required:
+          type: integer
+          description: Number of votes needed to veto a trade
+
+    Team:
+      type: object
+      properties:
+        team_id:
+          type: integer
+          description: Unique team identifier
+        team_name:
+          type: string
+          description: Team name
+          example: "Justin's Scary Team"
+        team_abbrev:
+          type: string
+          description: Team abbreviation
+          example: "JST"
+        owner:
+          type: string
+          description: Team owner's name
+        wins:
+          type: integer
+          description: Number of wins
+          example: 9
+        losses:
+          type: integer
+          description: Number of losses
+          example: 1
+        ties:
+          type: integer
+          description: Number of ties
+          example: 0
+        points_for:
+          type: number
+          format: float
+          description: Total points scored
+          example: 1283.85
+        points_against:
+          type: number
+          format: float
+          description: Total points scored against
+          example: 1042.3
+        standing:
+          type: integer
+          description: Current league standing
+          example: 1
+        final_standing:
+          type: integer
+          description: Final season standing
+        playoff_pct:
+          type: number
+          format: float
+          description: Playoff probability percentage
+          example: 99.8
+        division_id:
+          type: integer
+          description: Division identifier
+        division_name:
+          type: string
+          description: Division name
+        logo_url:
+          type: string
+          format: uri
+          description: Team logo URL
+        roster:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+        schedule:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+          description: List of opponent teams by week
+        scores:
+          type: array
+          items:
+            type: number
+            format: float
+          description: Weekly scores
+        outcomes:
+          type: array
+          items:
+            type: string
+            enum: [W, L, T]
+          description: Weekly outcomes
+        mov:
+          type: array
+          items:
+            type: number
+            format: float
+          description: Margin of victory/defeat by week
+        streak_type:
+          type: string
+          enum: [WIN, LOSS, TIE]
+          description: Current streak type
+        streak_length:
+          type: integer
+          description: Length of current streak
+        acquisitions:
+          type: integer
+          description: Number of acquisitions
+        drops:
+          type: integer
+          description: Number of drops
+        trades:
+          type: integer
+          description: Number of trades
+        waiver_rank:
+          type: integer
+          description: Current waiver priority
+        acquisition_budget_spent:
+          type: integer
+          description: FAAB budget spent
+        draft_projected_rank:
+          type: integer
+          description: Pre-draft projected rank
+
+    Player:
+      type: object
+      properties:
+        playerId:
+          type: integer
+          description: Unique player identifier
+          example: 4241389
+        name:
+          type: string
+          description: Player name
+          example: "CeeDee Lamb"
+        position:
+          type: string
+          description: Player position
+          enum: [QB, RB, WR, TE, K, D/ST]
+          example: "WR"
+        proTeam:
+          type: string
+          description: NFL team abbreviation
+          example: "DAL"
+        lineupSlot:
+          type: string
+          description: Current lineup slot
+          example: "WR"
+        eligibleSlots:
+          type: array
+          items:
+            type: string
+          description: Positions player is eligible for
+        total_points:
+          type: number
+          format: float
+          description: Total points scored this season
+          example: 83.2
+        avg_points:
+          type: number
+          format: float
+          description: Average points per game
+          example: 13.87
+        projected_total_points:
+          type: number
+          format: float
+          description: Season projection
+          example: 294.38
+        projected_avg_points:
+          type: number
+          format: float
+          description: Projected average points
+          example: 17.32
+        percent_owned:
+          type: number
+          format: float
+          description: Ownership percentage
+          example: 99.92
+        percent_started:
+          type: number
+          format: float
+          description: Started percentage
+          example: 89.09
+        posRank:
+          type: integer
+          description: Position rank
+          example: 38
+        injured:
+          type: boolean
+          description: Injury status flag
+        injuryStatus:
+          type: string
+          description: Detailed injury status
+          enum: [ACTIVE, QUESTIONABLE, DOUBTFUL, OUT, IR, PUP]
+          example: "ACTIVE"
+        active_status:
+          type: string
+          description: Active roster status
+          example: "active"
+        acquisitionType:
+          type: string
+          enum: [DRAFT, ADD, TRADE, NONE]
+          description: How player was acquired
+        onTeamId:
+          type: integer
+          description: Current team ID
+        stats:
+          type: object
+          additionalProperties:
+            type: object
+          description: Player statistics by week/period
+        schedule:
+          type: object
+          additionalProperties:
+            type: object
+          description: Upcoming game schedule
+
+    BoxScore:
+      type: object
+      properties:
+        home_team:
+          $ref: '#/components/schemas/Team'
+        away_team:
+          $ref: '#/components/schemas/Team'
+        home_score:
+          type: number
+          format: float
+          description: Home team score
+        away_score:
+          type: number
+          format: float
+          description: Away team score
+        home_lineup:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerGameStats'
+        away_lineup:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerGameStats'
+        home_projected:
+          type: number
+          format: float
+          description: Home team projected score
+        away_projected:
+          type: number
+          format: float
+          description: Away team projected score
+
+    PlayerGameStats:
+      type: object
+      properties:
+        player:
+          $ref: '#/components/schemas/Player'
+        points:
+          type: number
+          format: float
+          description: Points scored
+        projected_points:
+          type: number
+          format: float
+          description: Projected points
+        slot_position:
+          type: string
+          description: Lineup slot
+        stats:
+          type: object
+          description: Detailed game statistics
+
+    Matchup:
+      type: object
+      properties:
+        home_team:
+          $ref: '#/components/schemas/Team'
+        away_team:
+          $ref: '#/components/schemas/Team'
+        home_score:
+          type: number
+          format: float
+        away_score:
+          type: number
+          format: float
+        matchup_type:
+          type: string
+          enum: [REGULAR, PLAYOFF, CHAMPIONSHIP]
+        week:
+          type: integer
+
+    Transaction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [WAIVER, FREEAGENT, TRADE]
+        date:
+          type: string
+          format: date-time
+        team:
+          $ref: '#/components/schemas/Team'
+        players_added:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+        players_dropped:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+        bid_amount:
+          type: integer
+          description: FAAB bid amount (for waivers)
+
+    Activity:
+      type: object
+      properties:
+        msg_type:
+          type: string
+          description: Activity type
+        date:
+          type: string
+          format: date-time
+        team:
+          $ref: '#/components/schemas/Team'
+        player:
+          $ref: '#/components/schemas/Player'
+        action:
+          type: string
+          description: Activity description
+
+    DraftPick:
+      type: object
+      properties:
+        round_num:
+          type: integer
+          description: Draft round
+        round_pick:
+          type: integer
+          description: Pick number within round
+        overall_pick:
+          type: integer
+          description: Overall pick number
+        team:
+          $ref: '#/components/schemas/Team'
+        player:
+          $ref: '#/components/schemas/Player'
+        bid_amount:
+          type: integer
+          description: Auction bid amount (for auction drafts)
+
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: espn_s2
+      description: ESPN session cookie for authentication
+    SWIDAuth:
+      type: apiKey
+      in: cookie
+      name: swid
+      description: ESPN SWID cookie for authentication
+
+security:
+  - CookieAuth: []
+    SWIDAuth: []
